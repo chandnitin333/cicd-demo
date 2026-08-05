@@ -10,14 +10,14 @@ server (`demo.icadquesto.ai`) over SSH.
 cicd-demo/
 ├── .github/
 │   └── workflows/
-│       └── deploy.yml          # Build → Plan → Apply pipeline
+│       └── deploy.yml          # Init → Setup → Build & Push → Deploy
 ├── environments/
 │   ├── dev/
 │   │   └── terraform.tfvars    # host_port 8081
 │   ├── staging/
 │   │   └── terraform.tfvars    # host_port 8082
 │   └── prod/
-│       └── terraform.tfvars    # host_port 80
+│       └── terraform.tfvars    # host_port 8083
 ├── terraform/
 │   ├── providers.tf             # Backend + provider config (local for now)
 │   ├── variables.tf             # environment, ssh_*, host_port, image_tag
@@ -34,18 +34,26 @@ cicd-demo/
 Trigger the workflow manually from the **Actions** tab → *CI/CD Pipeline* →
 **Run workflow**. GitHub's own run dialog is where you pick the **branch**
 (via "Use workflow from") and the **environment** (via the `environment`
-input dropdown) before it runs.
+input dropdown) before it runs. The job graph is a straight chain of four
+stages:
 
 ```mermaid
 flowchart TD
-    A["Run workflow\n(pick branch + environment)"] --> B[Build & Push Docker image\nghcr.io/...:env-sha]
-    B --> C[Terraform Init + Workspace Select]
-    C --> D[Terraform Plan]
+    A["Run workflow\n(pick branch + environment)"] --> B[Init\nterraform fmt + validate]
+    B --> C["Setup\nterraform init + workspace select"]
+    C --> D["Build & Push\ndocker build/push → ghcr.io/...:env-sha"]
     D --> E{GitHub Environment\nprotection rules}
-    E -->|dev: auto| F1["SSH deploy → demo.icadquesto.ai:8081\ncontainer cicd-demo-dev"]
-    E -->|staging: reviewer approval| F2["SSH deploy → demo.icadquesto.ai:8082\ncontainer cicd-demo-staging"]
-    E -->|prod: reviewer approval| F3["SSH deploy → demo.icadquesto.ai:80\ncontainer cicd-demo-prod"]
+    E -->|dev: auto| F1["Deploy\nSSH → demo.icadquesto.ai:8081\ncontainer cicd-demo-dev"]
+    E -->|staging: reviewer approval| F2["Deploy\nSSH → demo.icadquesto.ai:8082\ncontainer cicd-demo-staging"]
+    E -->|prod: reviewer approval| F3["Deploy\nSSH → demo.icadquesto.ai:8083\ncontainer cicd-demo-prod"]
 ```
+
+| Job | What it does |
+|-----|---------------|
+| **Init** | Checkout, `terraform fmt -check`, `terraform validate` — fast sanity gate |
+| **Setup** | `terraform init` + `terraform workspace select -or-create <env>` |
+| **Build & Push** | Docker build, tag with `<env>-<sha>`, push to GHCR |
+| **Deploy** | `terraform plan` + `apply` — SSHes into the server and runs the container (gated by the GitHub Environment's approval rules) |
 
 ## Environment-wise deploys, one server
 
@@ -56,7 +64,7 @@ each as its own Docker container so they don't collide:
 |-------------|------------------------|-----------|
 | dev         | `cicd-demo-dev`        | 8081      |
 | staging     | `cicd-demo-staging`    | 8082      |
-| prod        | `cicd-demo-prod`       | 80        |
+| prod        | `cicd-demo-prod`       | 8083      |
 
 Each environment maps to:
 - a **Terraform workspace** (`dev`, `staging`, `prod`) → isolated state
@@ -76,8 +84,8 @@ Each environment maps to:
    containing the private key that matches a public key already
    authorized (`~/.ssh/authorized_keys`) for the SSH user on
    `demo.icadquesto.ai`.
-3. Edit `environments/<env>/terraform.tfvars` and replace `ssh_user`
-   (currently `REPLACE_ME`) with the real SSH username on that server.
+3. Confirm the `ssh_user` in each `environments/<env>/terraform.tfvars`
+   (currently `github-deploy`) matches a real SSH user on that server.
 4. Make sure Docker is running on `demo.icadquesto.ai` and the deploy
    user can run `docker` commands without `sudo` (add them to the
    `docker` group), and that the GHCR image is pullable from that server

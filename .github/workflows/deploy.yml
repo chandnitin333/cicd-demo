@@ -25,8 +25,54 @@ env:
   TF_WORKING_DIR: terraform
 
 jobs:
-  build:
-    name: Build & Push Image (${{ github.event.inputs.environment }})
+  init:
+    name: Init
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Terraform fmt check
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init (lint only, no backend)
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init -backend=false
+
+      - name: Terraform validate
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform validate
+
+  setup:
+    name: Setup
+    needs: init
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init
+
+      - name: Terraform Workspace Select
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform workspace select -or-create ${{ github.event.inputs.environment }}
+
+  build-and-push:
+    name: Build & Push
+    needs: setup
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.tag.outputs.image_tag }}
@@ -57,9 +103,9 @@ jobs:
             ${{ steps.tag.outputs.image_tag }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.environment }}-latest
 
-  plan:
-    name: Terraform Plan (${{ github.event.inputs.environment }})
-    needs: build
+  deploy:
+    name: Deploy
+    needs: build-and-push
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment }}
     steps:
@@ -84,43 +130,8 @@ jobs:
         run: |
           terraform plan \
             -var-file=../environments/${{ github.event.inputs.environment }}/terraform.tfvars \
-            -var="image_tag=${{ needs.build.outputs.image_tag }}" \
+            -var="image_tag=${{ needs.build-and-push.outputs.image_tag }}" \
             -out=tfplan
-
-      - name: Upload Plan Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: tfplan-${{ github.event.inputs.environment }}
-          path: ${{ env.TF_WORKING_DIR }}/tfplan
-          retention-days: 1
-
-  apply:
-    name: Terraform Apply (${{ github.event.inputs.environment }})
-    needs: [build, plan]
-    runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_wrapper: false
-
-      - name: Terraform Init
-        working-directory: ${{ env.TF_WORKING_DIR }}
-        run: terraform init
-
-      - name: Terraform Workspace Select
-        working-directory: ${{ env.TF_WORKING_DIR }}
-        run: terraform workspace select -or-create ${{ github.event.inputs.environment }}
-
-      - name: Download Plan Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: tfplan-${{ github.event.inputs.environment }}
-          path: ${{ env.TF_WORKING_DIR }}
 
       - name: Terraform Apply
         working-directory: ${{ env.TF_WORKING_DIR }}
