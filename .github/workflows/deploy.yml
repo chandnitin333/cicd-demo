@@ -127,6 +127,11 @@ jobs:
 
       - name: Terraform Plan
         working-directory: ${{ env.TF_WORKING_DIR }}
+        # SSH_PRIVATE_KEY must be set here too — `terraform apply tfplan`
+        # replays this saved plan verbatim and does not re-read variables,
+        # so the key has to be baked in at plan time or auth silently uses "".
+        env:
+          TF_VAR_ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
           terraform plan \
             -var-file=../environments/${{ github.event.inputs.environment }}/terraform.tfvars \
@@ -135,8 +140,4 @@ jobs:
 
       - name: Terraform Apply
         working-directory: ${{ env.TF_WORKING_DIR }}
-        # SSH_PRIVATE_KEY must be set on each of the dev/staging/prod
-        # GitHub Environments — all three deploy to the same server.
-        env:
-          TF_VAR_ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY }}
         run: terraform apply -auto-approve tfplan
