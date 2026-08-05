@@ -124,4 +124,8 @@ jobs:
 
       - name: Terraform Apply
         working-directory: ${{ env.TF_WORKING_DIR }}
+        # SSH_PRIVATE_KEY must be set on each of the dev/staging/prod
+        # GitHub Environments — all three deploy to the same server.
+        env:
+          TF_VAR_ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY }}
         run: terraform apply -auto-approve tfplan
