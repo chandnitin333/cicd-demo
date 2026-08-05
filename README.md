@@ -2,7 +2,7 @@
 
 A "Coming Soon" static site deployed through a GitHub Actions pipeline that
 builds a Docker image and deploys it, per environment, to a single shared
-server (`icadquesto.ai`) over SSH.
+server (`demo.icadquesto.ai`) over SSH.
 
 ## Repo structure
 
@@ -43,9 +43,9 @@ flowchart TD
     B --> C["Setup\nterraform init + workspace select"]
     C --> D["Build & Push\ndocker build/push → ghcr.io/...:env-sha"]
     D --> E{GitHub Environment\nprotection rules}
-    E -->|dev: auto| F1["Deploy\nSSH → icadquesto.ai:8081\ncontainer cicd-demo-dev"]
-    E -->|staging: reviewer approval| F2["Deploy\nSSH → icadquesto.ai:8082\ncontainer cicd-demo-staging"]
-    E -->|prod: reviewer approval| F3["Deploy\nSSH → icadquesto.ai:8083\ncontainer cicd-demo-prod"]
+    E -->|dev: auto| F1["Deploy\nSSH → demo.icadquesto.ai:8081\ncontainer cicd-demo-dev"]
+    E -->|staging: reviewer approval| F2["Deploy\nSSH → demo.icadquesto.ai:8082\ncontainer cicd-demo-staging"]
+    E -->|prod: reviewer approval| F3["Deploy\nSSH → demo.icadquesto.ai:8083\ncontainer cicd-demo-prod"]
 ```
 
 | Job | What it does |
@@ -57,7 +57,7 @@ flowchart TD
 
 ## Environment-wise deploys, one server
 
-All three environments deploy to the **same host** (`icadquesto.ai`),
+All three environments deploy to the **same host** (`demo.icadquesto.ai`),
 each as its own Docker container so they don't collide:
 
 | Environment | Container name        | Host port |
@@ -74,7 +74,7 @@ Each environment maps to:
   and the `SSH_PRIVATE_KEY` secret per environment in
   *Settings → Environments*. This is what gates `staging`/`prod` behind
   manual approval while letting `dev` run straight through, and is where
-  the SSH private key for `icadquesto.ai` gets stored.
+  the SSH private key for `demo.icadquesto.ai` gets stored.
 
 ## Setup checklist
 
@@ -83,10 +83,10 @@ Each environment maps to:
 2. On each of those three environments, add secret `SSH_PRIVATE_KEY`
    containing the private key that matches a public key already
    authorized (`~/.ssh/authorized_keys`) for the SSH user on
-   `icadquesto.ai`.
+   `demo.icadquesto.ai`.
 3. Confirm the `ssh_user` in each `environments/<env>/terraform.tfvars`
    (currently `github-deploy`) matches a real SSH user on that server.
-4. Make sure Docker is running on `icadquesto.ai` and the deploy
+4. Make sure Docker is running on `demo.icadquesto.ai` and the deploy
    user can run `docker` commands without `sudo` (add them to the
    `docker` group), and that the GHCR image is pullable from that server
    — either make the package public, or add a `docker login` line to
@@ -95,7 +95,7 @@ Each environment maps to:
    `https://github.com/chandnitin333/cicd-demo.git`).
 6. Run the workflow from the Actions tab, choosing the branch and
    environment. Each Terraform output includes the reachable `url`
-   (e.g. `http://icadquesto.ai:8081` for dev).
+   (e.g. `http://demo.icadquesto.ai:8081` for dev).
 
 ## Notes / next steps
 
