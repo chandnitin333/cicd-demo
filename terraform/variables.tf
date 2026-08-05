@@ -25,7 +25,7 @@ variable "image_tag" {
 variable "ssh_host" {
   description = "SSH host of the shared deploy server"
   type        = string
-  default     = "demo.icadquesto.ai"
+  default     = "icadquesto.ai"
 }
 
 variable "ssh_user" {
