@@ -16,6 +16,10 @@ resource "null_resource" "deploy" {
     user        = var.ssh_user
     port        = var.ssh_port
     private_key = var.ssh_private_key
+    # /tmp is mounted noexec on the deploy server, so the default script_path
+    # there fails with "Permission denied" (exit 126). Use the user's home
+    # directory instead, which allows execution.
+    script_path = "/home/${var.ssh_user}/tf_%RAND%.sh"
   }
 
   provisioner "remote-exec" {
