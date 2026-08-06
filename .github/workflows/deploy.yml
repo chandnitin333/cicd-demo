@@ -1,5 +1,9 @@
 name: CI/CD Pipeline
 
+# Shows branch, environment, and who triggered the run right in the Actions
+# run list/title, instead of just the generic workflow name.
+run-name: "Deploy ${{ inputs.environment }} · ${{ github.ref_name }} · @${{ github.actor }}"
+
 # Branch is chosen via the "Use workflow from" branch picker when running
 # this workflow manually (Actions tab -> CI/CD Pipeline -> Run workflow).
 on:
@@ -29,6 +33,18 @@ jobs:
     name: Init
     runs-on: ubuntu-latest
     steps:
+      - name: Pipeline summary
+        run: |
+          {
+            echo "### Deployment details"
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| Branch | \`${{ github.ref_name }}\` |"
+            echo "| Environment | \`${{ inputs.environment }}\` |"
+            echo "| Triggered by | @${{ github.actor }} |"
+            echo "| Commit | [\`${{ github.sha }}\`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}) |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -50,7 +66,7 @@ jobs:
         run: terraform validate
 
   setup:
-    name: Setup
+    name: "Setup (${{ inputs.environment }})"
     needs: init
     runs-on: ubuntu-latest
     steps:
@@ -71,7 +87,7 @@ jobs:
         run: terraform workspace select -or-create ${{ github.event.inputs.environment }}
 
   build-and-push:
-    name: Build & Push
+    name: "Build & Push (${{ inputs.environment }})"
     needs: setup
     runs-on: ubuntu-latest
     outputs:
