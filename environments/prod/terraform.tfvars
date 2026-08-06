@@ -1,6 +1,6 @@
 environment = "prod"
 app_name    = "cicd-demo"
-ssh_host    = "icadquesto.ai"
+ssh_host    = "151.106.41.61"
 ssh_user    = "github-deploy" # SSH username on the server
 ssh_port    = 22
 host_port   = 8083
